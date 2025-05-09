@@ -1,22 +1,230 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wykres Lightweight TradingView</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Interaktywny wykres podaży pieniądza</title>
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Lightweight Charts -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        :root {
+            --bg: #fafafa;
+            --fg: #333;
+            --accent: #556ee6;
+            --sidebar-bg: #fff;
+            --sidebar-border: #ddd;
+            --chart-bg: #f5f5f5;
+        }
+        body.dark {
+            --bg: #2b2b2b;
+            --fg: #eee;
+            --accent: #4fa3ff;
+            --sidebar-bg: #333;
+            --sidebar-border: #444;
+            --chart-bg: #2a2a2a;
+        }
+        body {
+            margin:0; padding:0;
+            font-family: 'Roboto', sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .sidebar {
+            background: var(--sidebar-bg);
+            border-right:1px solid var(--sidebar-border);
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        .toolbar {
+            display: flex;
+            gap: 1rem;
+            padding: 0.5rem 1rem;
+            background: var(--sidebar-bg);
+            border-bottom:1px solid var(--sidebar-border);
+        }
+        .chart-container {
+            display:flex;
+            flex-direction:column;
+            background: var(--chart-bg);
+        }
+        #chart {
+            flex:1;
+        }
+        .tree ul {
+            list-style-type: none;
+            padding-left:1em;
+        }
+        .tree li {
+            margin:0.2em 0;
+            position: relative;
+        }
+        .tree li .caret {
+            cursor: pointer;
+            user-select: none;
+        }
+        .tree li .caret::before {
+            content: "\25B6";
+            display: inline-block;
+            margin-right: 5px;
+            transition: transform 0.2s;
+        }
+        .tree li .caret.open::before {
+            transform: rotate(90deg);
+        }
+        .nested {
+            display: none;
+        }
+        .nested.open {
+            display: block;
+        }
+        .series-label {
+            cursor: pointer;
+        }
+        button {
+            cursor: pointer;
+            background: var(--accent);
+            border:none;
+            color:#fff;
+            padding:0.4em 0.8em;
+            font-weight:500;
+            border-radius:4px;
+        }
+        select, input[type=checkbox] {
+            accent-color: var(--accent);
+        }
+    </style>
 </head>
 <body>
-  <h1>Wykres danych z JSON</h1>
-  <div>
-    <button id="allData">Wszystkie dane</button>
-    <button id="lastQuarter">Ostatni kwartał</button>
-    <button id="lastYear">Ostatni rok</button>
-    <button id="toggleScale">Zmień skalę (Procentowa/Liniowa)</button>
-  </div>
-  <div id="chart"></div>
-  <div id="error" style="color: red;"></div>
-  <script src="https://unpkg.com/lightweight-charts@4.0.1/dist/lightweight-charts.standalone.production.js"></script>
-  <script src="script.js"></script>
+    <div class="sidebar">
+        <h2>Wybierz serie</h2>
+        <div class="tree" id="seriesTree"></div>
+    </div>
+    <div class="chart-container">
+        <div class="toolbar">
+            <label><input type="checkbox" id="percentScale"> Skala procentowa</label>
+            <label>Typ serii:
+                <select id="seriesType">
+                    <option value="Line">Linia</option>
+                    <option value="Candlestick">Świecowy</option>
+                    <option value="Histogram">Histogram</option>
+                    <option value="Area">Obszar</option>
+                </select>
+            </label>
+            <label>Zakres:
+                <select id="timeframe">
+                    <option value="all">Wszystko</option>
+                    <option value="1y">1 rok</option>
+                    <option value="5y">5 lat</option>
+                </select>
+            </label>
+            <button id="screenshotBtn">Eksportuj obraz</button>
+            <button id="themeToggle">Tryb ciemny</button>
+        </div>
+        <div id="chart"></div>
+    </div>
+    <script>
+    async function init() {
+        const resp = await fetch('am_data.json');
+        const { columns } = await resp.json();
+        // Grupa wg category (jeśli istnieje)
+        const grouped = {};
+        columns.forEach(col => {
+            const cat = col.category || 'Serie';
+            if (!grouped[cat]) grouped[cat]=[];
+            grouped[cat].push(col);
+        });
+        // Zbuduj drzewo
+        const treeContainer = document.getElementById('seriesTree');
+        Object.entries(grouped).forEach(([cat, items])=>{
+            const li = document.createElement('li');
+            const caret = document.createElement('span');
+            caret.textContent = cat;
+            caret.classList.add('caret');
+            li.append(caret);
+            const ul = document.createElement('ul');
+            ul.classList.add('nested');
+            items.forEach(col=>{
+                const itemLi = document.createElement('li');
+                const cb = document.createElement('input'); cb.type='checkbox'; cb.dataset.id=col.column_id;
+                const lbl = document.createElement('span'); lbl.textContent = col.column; lbl.classList.add('series-label');
+                itemLi.append(cb, lbl);
+                ul.append(itemLi);
+            });
+            li.append(ul);
+            treeContainer.append(li);
+            caret.addEventListener('click', ()=>{
+                caret.classList.toggle('open');
+                ul.classList.toggle('open');
+            });
+        });
+
+        // Inicjalizacja chartu
+        const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+            layout: { backgroundColor: document.body.classList.contains('dark') ? '#2a2a2a' : '#f5f5f5', textColor: document.body.classList.contains('dark') ? '#eee' : '#333' },
+            width: document.body.clientWidth - 250,
+            height: document.body.clientHeight - document.querySelector('.toolbar').offsetHeight,
+            rightPriceScale: { mode: LightweightCharts.PriceScaleMode.Normal },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+            localisation: { dateFormat: 'yyyy-MM-dd' },
+        });
+        window.addEventListener('resize', ()=>{
+            chart.applyOptions({ width: document.body.clientWidth - 250, height: document.body.clientHeight - document.querySelector('.toolbar').offsetHeight });
+        });
+        const seriesMap = new Map();
+        // Funkcja update
+        function updateSeries(id, add) {
+            const col = columns.find(c=>c.column_id==id);
+            if (add) {
+                const type = document.getElementById('seriesType').value;
+                let series;
+                switch(type) {
+                    case 'Candlestick': series = chart.addCandlestickSeries(); break;
+                    case 'Histogram': series = chart.addHistogramSeries({ priceFormat: { type: 'volume' } }); break;
+                    case 'Area': series = chart.addAreaSeries({ topColor: 'rgba(86,110,230,0.6)', bottomColor: 'rgba(86,110,230,0.1)', lineColor: '#556ee6' }); break;
+                    default: series = chart.addLineSeries({ color: '#556ee6' });
+                }
+                series.setData(col.data.map(d=>({time:d.date, value:d.value})));
+                series.applyOptions({ title: col.column });
+                seriesMap.set(id, series);
+            } else {
+                const s = seriesMap.get(id);
+                if (s) chart.removeSeries(s);
+                seriesMap.delete(id);
+            }
+        }
+        // Event dla checkboxów
+        document.querySelectorAll('#seriesTree input[type=checkbox]').forEach(cb=>{
+            cb.addEventListener('change', event=>{
+                updateSeries(event.target.dataset.id, event.target.checked);
+            });
+        });
+        // Pozostałe kontrolki
+        document.getElementById('percentScale').addEventListener('change', e=>{
+            chart.applyOptions({ rightPriceScale: { mode: e.target.checked ? LightweightCharts.PriceScaleMode.Percentage : LightweightCharts.PriceScaleMode.Normal } });
+        });
+        document.getElementById('timeframe').addEventListener('change', e=>{
+            const now = Math.floor(Date.now()/1000);
+            if (e.target.value==='all') return chart.timeScale().fitContent();
+            const years = parseInt(e.target.value);
+            const from = new Date(); from.setFullYear(from.getFullYear()-years);
+            chart.timeScale().setVisibleRange({ from: Math.floor(from.getTime()/1000), to: now });
+        });
+        document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
+            const img = await chart.takeScreenshot();
+            const a = document.createElement('a'); a.href=img; a.download='chart.png'; a.click();
+        });
+        document.getElementById('themeToggle').addEventListener('click', ()=>{
+            document.body.classList.toggle('dark');
+            document.getElementById('themeToggle').textContent = document.body.classList.contains('dark') ? 'Tryb jasny' : 'Tryb ciemny';
+        });
+    }
+    init();
+    </script>
 </body>
 </html>
