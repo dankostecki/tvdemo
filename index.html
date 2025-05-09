@@ -1,114 +1,191 @@
 <!DOCTYPE html>
-<html lang="pl" class="dark">
+<html lang="pl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TradingView Data Service</title>
-  <!-- TailwindCSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Material Icons -->
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
-  <!-- Lightweight Charts -->
-  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-  <!-- Najpierw data.js definiujące `const data = [...]` -->
-  <script src="data.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wykres TradingView - Podaż pieniądza M1, M2, M3</title>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f7fafc;
+            color: #333333;
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1a202c;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .legend-item span {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+
+        .legend-item.disabled {
+            opacity: 0.5;
+        }
+
+        #chart {
+            width: 100%;
+            height: 600px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+        }
+    </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col h-screen">
-  <!-- Navbar -->
-  <nav class="flex items-center justify-between p-4 bg-white dark:bg-gray-800 shadow-md">
-    <h1 class="text-xl font-semibold">📈 TradingView Chart</h1>
-    <div class="flex items-center space-x-3">
-      <button id="lineBtn" class="px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">Linia</button>
-      <button id="candleBtn" class="px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">Świece</button>
-      <button id="areaBtn" class="px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">Obszar</button>
-      <button id="histogramBtn" class="px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">Histogram</button>
-      <label class="flex items-center px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
-        <span class="material-icons">percent</span>
-        <input type="checkbox" id="percentScale" class="ml-1" />
-      </label>
-      <select id="timeframe" class="px-3 py-1 bg-white dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
-        <option value="all">Wszystko</option>
-        <option value="1y">1 rok</option>
-        <option value="5y">5 lat</option>
-      </select>
-      <button id="themeToggle" class="px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
-        <span class="material-icons" id="themeIcon">dark_mode</span>
-      </button>
+<body>
+    <div class="container">
+        <h1>Podaż pieniądza: M1, M2, M3</h1>
+        <div class="legend">
+            <div class="legend-item" id="legend-m1" onclick="toggleSeries('m1')">
+                <span style="background-color: #3182ce;"></span> M1
+            </div>
+            <div class="legend-item" id="legend-m2" onclick="toggleSeries('m2')">
+                <span style="background-color: #38a169;"></span> M2
+            </div>
+            <div class="legend-item" id="legend-m3" onclick="toggleSeries('m3')">
+                <span style="background-color: #e53e3e;"></span> M3
+            </div>
+        </div>
+        <div id="chart"></div>
     </div>
-  </nav>
 
-  <!-- Chart Container -->
-  <div id="chart" class="flex-1 m-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg"></div>
+    <script>
+        // URL-e do plików JSON na GitHubie (Raw URL)
+        const dataUrls = {
+            m1: 'https://raw.githubusercontent.com/dankostecki/tvdemo/main/m1.json',
+            m2: 'https://raw.githubusercontent.com/dankostecki/tvdemo/main/m2.json',
+            m3: 'https://raw.githubusercontent.com/dankostecki/tvdemo/main/m3.json'
+        };
 
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      if (typeof data === 'undefined' || !Array.isArray(data) || data.length === 0) {
-        console.error('Brak danych: upewnij się, że data.js definiuje `const data = [...]` i jest załadowany przed tą sekcją.');
-        return;
-      }
+        // Kolory dla serii
+        const seriesColors = {
+            m1: '#3182ce', // Niebieski
+            m2: '#38a169', // Zielony
+            m3: '#e53e3e'  // Czerwony
+        };
 
-      // Inicjalizacja chartu
-      const chart = LightweightCharts.createChart(document.getElementById('chart'), {
-        layout: {
-          backgroundColor: getComputedStyle(document.getElementById('chart')).backgroundColor,
-          textColor: getComputedStyle(document.body).color
-        },
-        rightPriceScale: { mode: LightweightCharts.PriceScaleMode.Normal },
-        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-        localization: { dateFormat: 'yyyy-MM-dd' },
-      });
+        // Inicjalizacja wykresu
+        const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+            width: document.getElementById('chart').clientWidth,
+            height: 600,
+            layout: {
+                background: { color: '#ffffff' },
+                textColor: '#333333',
+            },
+            grid: {
+                vertLines: { color: '#e2e8f0' },
+                horzLines: { color: '#e2e8f0' },
+            },
+            timeScale: {
+                timeVisible: true,
+                secondsVisible: false,
+            },
+            localization: {
+                dateFormat: 'yyyy-MM-dd',
+            },
+        });
 
-      let series = chart.addLineSeries({ color: '#3b82f6' });
-      series.setData(data);
+        // Obiekt przechowujący serie
+        const series = {
+            m1: chart.addLineSeries({ color: seriesColors.m1, title: 'M1' }),
+            m2: chart.addLineSeries({ color: seriesColors.m2, title: 'M2' }),
+            m3: chart.addLineSeries({ color: seriesColors.m3, title: 'M3' })
+        };
 
-      // Helpers
-      function resetSeries(type) {
-        chart.removeSeries(series);
-        switch(type) {
-          case 'candle': series = chart.addCandlestickSeries(); break;
-          case 'area': series = chart.addAreaSeries({ topColor: 'rgba(59,130,246,0.5)', bottomColor: 'rgba(59,130,246,0.1)', lineColor: '#3b82f6' }); break;
-          case 'hist': series = chart.addHistogramSeries({ priceFormat: { type: 'volume' } }); break;
-          default: series = chart.addLineSeries({ color: '#3b82f6' });
+        // Obiekt przechowujący dane
+        const seriesData = {
+            m1: [],
+            m2: [],
+            m3: []
+        };
+
+        // Obiekt przechowujący widoczność serii
+        const seriesVisibility = {
+            m1: true,
+            m2: true,
+            m3: true
+        };
+
+        // Funkcja do wczytywania danych
+        async function loadData() {
+            try {
+                for (const [key, url] of Object.entries(dataUrls)) {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`Nie udało się wczytać ${key}`);
+                    const data = await response.json();
+                    seriesData[key] = data;
+                    series[key].setData(data);
+                }
+                chart.timeScale().fitContent();
+            } catch (error) {
+                console.error('Błąd podczas wczytywania danych:', error);
+                alert('Wystąpił błąd podczas wczytywania danych. Sprawdź konsolę dla szczegółów.');
+            }
         }
-        series.setData(data);
-        applyScale();
-        applyTimeframe();
-      }
 
-      function applyScale() {
-        const pct = document.getElementById('percentScale').checked;
-        chart.applyOptions({ rightPriceScale: { mode: pct ? LightweightCharts.PriceScaleMode.Percentage : LightweightCharts.PriceScaleMode.Normal } });
-      }
-
-      function applyTimeframe() {
-        const val = document.getElementById('timeframe').value;
-        if (val === 'all') {
-          chart.timeScale().fitContent();
-          return;
+        // Funkcja do przełączania widoczności serii
+        function toggleSeries(key) {
+            seriesVisibility[key] = !seriesVisibility[key];
+            const legendItem = document.getElementById(`legend-${key}`);
+            if (seriesVisibility[key]) {
+                legendItem.classList.remove('disabled');
+                series[key].setData(seriesData[key]);
+            } else {
+                legendItem.classList.add('disabled');
+                series[key].setData([]);
+            }
+            chart.timeScale().fitContent();
         }
-        const yrs = parseInt(val, 10);
-        const now = Math.floor(Date.now() / 1000);
-        const from = new Date(); from.setFullYear(from.getFullYear() - yrs);
-        chart.timeScale().setVisibleRange({ from: Math.floor(from.getTime() / 1000), to: now });
-      }
 
-      // Eventy
-      document.getElementById('lineBtn').addEventListener('click', () => resetSeries('line'));
-      document.getElementById('candleBtn').addEventListener('click', () => resetSeries('candle'));
-      document.getElementById('areaBtn').addEventListener('click', () => resetSeries('area'));
-      document.getElementById('histogramBtn').addEventListener('click', () => resetSeries('hist'));
-      document.getElementById('percentScale').addEventListener('change', applyScale);
-      document.getElementById('timeframe').addEventListener('change', applyTimeframe);
-      document.getElementById('themeToggle').addEventListener('click', () => {
-        document.documentElement.classList.toggle('dark');
-        const isDark = document.documentElement.classList.contains('dark');
-        document.getElementById('themeIcon').textContent = isDark ? 'light_mode' : 'dark_mode';
-        chart.applyOptions({ layout: { backgroundColor: getComputedStyle(document.getElementById('chart')).backgroundColor, textColor: getComputedStyle(document.body).color } });
-      });
+        // Wczytaj dane po załadowaniu strony
+        loadData();
 
-      // Fit content on load
-      chart.timeScale().fitContent();
-    });
-  </script>
+        // Obsługa zmiany rozmiaru okna
+        window.addEventListener('resize', () => {
+            chart.resize(document.getElementById('chart').clientWidth, 600);
+        });
+    </script>
 </body>
 </html>
