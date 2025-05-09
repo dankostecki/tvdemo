@@ -5,74 +5,101 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Interaktywny wykres podaży pieniądza</title>
     <!-- Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <!-- Lightweight Charts -->
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         :root {
-            --bg: #fafafa;
-            --fg: #333;
-            --accent: #556ee6;
-            --sidebar-bg: #fff;
-            --sidebar-border: #ddd;
-            --chart-bg: #f5f5f5;
+            --bg: #f0f2f5;
+            --fg: #1f2937;
+            --primary: #4f46e5;
+            --primary-light: #6366f1;
+            --accent: #3b82f6;
+            --card-bg: #ffffff;
+            --sidebar-bg: #ffffff;
+            --toolbar-bg: #ffffff;
+            --shadow: rgba(0,0,0,0.1);
+            --transition: 200ms ease;
         }
         body.dark {
-            --bg: #2b2b2b;
-            --fg: #eee;
-            --accent: #4fa3ff;
-            --sidebar-bg: #333;
-            --sidebar-border: #444;
-            --chart-bg: #2a2a2a;
+            --bg: #121212;
+            --fg: #e5e7eb;
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --accent: #3b82f6;
+            --card-bg: #1f1f1f;
+            --sidebar-bg: #1a1a1a;
+            --toolbar-bg: #1a1a1a;
+            --shadow: rgba(0,0,0,0.5);
         }
+        * { box-sizing: border-box; }
         body {
             margin:0; padding:0;
-            font-family: 'Roboto', sans-serif;
+            font-family: 'Inter', sans-serif;
             background: var(--bg);
             color: var(--fg);
             display: grid;
-            grid-template-columns: 250px 1fr;
+            grid-template-columns: 280px 1fr;
             height: 100vh;
             overflow: hidden;
         }
         .sidebar {
             background: var(--sidebar-bg);
-            border-right:1px solid var(--sidebar-border);
-            padding: 1rem;
+            box-shadow: 2px 0 8px var(--shadow);
+            padding: 1.5rem;
             overflow-y: auto;
         }
         .toolbar {
             display: flex;
+            align-items: center;
             gap: 1rem;
-            padding: 0.5rem 1rem;
-            background: var(--sidebar-bg);
-            border-bottom:1px solid var(--sidebar-border);
+            padding: 0.75rem 1.5rem;
+            background: var(--toolbar-bg);
+            box-shadow: 0 2px 8px var(--shadow);
+            z-index: 1;
         }
         .chart-container {
             display:flex;
             flex-direction:column;
-            background: var(--chart-bg);
+            background: var(--chart-bg, var(--bg));
         }
         #chart {
             flex:1;
+            margin: 1rem;
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px var(--shadow);
+            transition: transform var(--transition);
+        }
+        #chart:hover { transform: translateY(-2px); }
+        h2 {
+            margin-top:0;
+            font-size: 1.25rem;
         }
         .tree ul {
-            list-style-type: none;
-            padding-left:1em;
+            list-style: none;
+            padding-left: 1em;
+            margin: .25em 0;
         }
         .tree li {
-            margin:0.2em 0;
-            position: relative;
+            margin: .3em 0;
         }
         .tree li .caret {
             cursor: pointer;
-            user-select: none;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.25em;
+            transition: color var(--transition);
         }
+        .tree li .caret:hover { color: var(--accent); }
         .tree li .caret::before {
             content: "\25B6";
             display: inline-block;
-            margin-right: 5px;
-            transition: transform 0.2s;
+            transition: transform var(--transition);
         }
         .tree li .caret.open::before {
             transform: rotate(90deg);
@@ -83,148 +110,160 @@
         .nested.open {
             display: block;
         }
-        .series-label {
-            cursor: pointer;
+        .series-item {
+            display: flex;
+            align-items: center;
+            gap: .5em;
+            padding: .25em .5em;
+            border-radius: 6px;
+            transition: background var(--transition);
         }
+        .series-item:hover { background: rgba(59,130,246,0.1); }
+        .series-item input { accent-color: var(--accent); }
+        .series-label { flex:1; cursor: pointer; }
         button {
-            cursor: pointer;
-            background: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: .5em;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
             border:none;
             color:#fff;
-            padding:0.4em 0.8em;
-            font-weight:500;
-            border-radius:4px;
+            padding:.5em 1em;
+            font-size: .9rem;
+            font-weight: 500;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px var(--shadow);
+            transition: transform var(--transition), box-shadow var(--transition);
         }
-        select, input[type=checkbox] {
-            accent-color: var(--accent);
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 12px var(--shadow); }
+        select,
+        label input[type=checkbox] {
+            margin-left: .3em;
+            font-size: .9rem;
         }
     </style>
 </head>
 <body>
-    <div class="sidebar">
+    <aside class="sidebar">
         <h2>Wybierz serie</h2>
         <div class="tree" id="seriesTree"></div>
-    </div>
-    <div class="chart-container">
+    </aside>
+    <section class="chart-container">
         <div class="toolbar">
-            <label><input type="checkbox" id="percentScale"> Skala procentowa</label>
-            <label>Typ serii:
-                <select id="seriesType">
-                    <option value="Line">Linia</option>
-                    <option value="Candlestick">Świecowy</option>
-                    <option value="Histogram">Histogram</option>
-                    <option value="Area">Obszar</option>
-                </select>
-            </label>
-            <label>Zakres:
-                <select id="timeframe">
-                    <option value="all">Wszystko</option>
-                    <option value="1y">1 rok</option>
-                    <option value="5y">5 lat</option>
-                </select>
-            </label>
-            <button id="screenshotBtn">Eksportuj obraz</button>
-            <button id="themeToggle">Tryb ciemny</button>
+            <label title="Skala procentowa"><span class="material-icons">percent</span><input type="checkbox" id="percentScale"></label>
+            <label title="Typ serii"><span class="material-icons">timeline</span><select id="seriesType"><option value="Line">Linia</option><option value="Candlestick">Świecowy</option><option value="Histogram">Histogram</option><option value="Area">Obszar</option></select></label>
+            <label title="Zakres czasowy"><span class="material-icons">date_range</span><select id="timeframe"><option value="all">Wszystko</option><option value="1y">1 rok</option><option value="5y">5 lat</option></select></label>
+            <button id="screenshotBtn"><span class="material-icons">camera_alt</span> Eksportuj</button>
+            <button id="themeToggle"><span class="material-icons" id="themeIcon">dark_mode</span><span id="themeText">Tryb ciemny</span></button>
         </div>
         <div id="chart"></div>
-    </div>
+    </section>
     <script>
-    async function init() {
-        const resp = await fetch('am_data.json');
-        const { columns } = await resp.json();
-        // Grupa wg category (jeśli istnieje)
-        const grouped = {};
-        columns.forEach(col => {
-            const cat = col.category || 'Serie';
-            if (!grouped[cat]) grouped[cat]=[];
-            grouped[cat].push(col);
-        });
-        // Zbuduj drzewo
-        const treeContainer = document.getElementById('seriesTree');
-        Object.entries(grouped).forEach(([cat, items])=>{
-            const li = document.createElement('li');
-            const caret = document.createElement('span');
-            caret.textContent = cat;
-            caret.classList.add('caret');
-            li.append(caret);
-            const ul = document.createElement('ul');
-            ul.classList.add('nested');
-            items.forEach(col=>{
-                const itemLi = document.createElement('li');
-                const cb = document.createElement('input'); cb.type='checkbox'; cb.dataset.id=col.column_id;
-                const lbl = document.createElement('span'); lbl.textContent = col.column; lbl.classList.add('series-label');
-                itemLi.append(cb, lbl);
-                ul.append(itemLi);
-            });
-            li.append(ul);
-            treeContainer.append(li);
-            caret.addEventListener('click', ()=>{
-                caret.classList.toggle('open');
-                ul.classList.toggle('open');
-            });
-        });
-
-        // Inicjalizacja chartu
-        const chart = LightweightCharts.createChart(document.getElementById('chart'), {
-            layout: { backgroundColor: document.body.classList.contains('dark') ? '#2a2a2a' : '#f5f5f5', textColor: document.body.classList.contains('dark') ? '#eee' : '#333' },
-            width: document.body.clientWidth - 250,
-            height: document.body.clientHeight - document.querySelector('.toolbar').offsetHeight,
-            rightPriceScale: { mode: LightweightCharts.PriceScaleMode.Normal },
-            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-            localisation: { dateFormat: 'yyyy-MM-dd' },
-        });
-        window.addEventListener('resize', ()=>{
-            chart.applyOptions({ width: document.body.clientWidth - 250, height: document.body.clientHeight - document.querySelector('.toolbar').offsetHeight });
-        });
-        const seriesMap = new Map();
-        // Funkcja update
-        function updateSeries(id, add) {
-            const col = columns.find(c=>c.column_id==id);
-            if (add) {
-                const type = document.getElementById('seriesType').value;
-                let series;
-                switch(type) {
-                    case 'Candlestick': series = chart.addCandlestickSeries(); break;
-                    case 'Histogram': series = chart.addHistogramSeries({ priceFormat: { type: 'volume' } }); break;
-                    case 'Area': series = chart.addAreaSeries({ topColor: 'rgba(86,110,230,0.6)', bottomColor: 'rgba(86,110,230,0.1)', lineColor: '#556ee6' }); break;
-                    default: series = chart.addLineSeries({ color: '#556ee6' });
-                }
-                series.setData(col.data.map(d=>({time:d.date, value:d.value})));
-                series.applyOptions({ title: col.column });
-                seriesMap.set(id, series);
-            } else {
-                const s = seriesMap.get(id);
-                if (s) chart.removeSeries(s);
-                seriesMap.delete(id);
-            }
+        // Konwersja surowego JSON do formatu LC
+        function transformRaw(raw) {
+            const cols = raw.columns || raw;
+            return cols.map(col => ({
+                ...col,
+                data: (col.data || []).map(d => ({
+                    time: Math.floor(new Date(d.date).getTime()/1000),
+                    value: typeof d.value === 'string'
+                        ? parseFloat(d.value.replace(/,/g, ''))
+                        : d.value
+                }))
+            }));
         }
-        // Event dla checkboxów
-        document.querySelectorAll('#seriesTree input[type=checkbox]').forEach(cb=>{
-            cb.addEventListener('change', event=>{
-                updateSeries(event.target.dataset.id, event.target.checked);
+        async function init() {
+            let columns;
+            try {
+                const resp = await fetch('am_data.json');
+                const raw = await resp.json();
+                columns = transformRaw(raw);
+            } catch (err) {
+                console.error('Błąd ładowania danych:', err);
+                return;
+            }
+            // Grupowanie po kategoriach
+            const grouped = {};
+            columns.forEach(col => {
+                const cat = col.category || 'Inne';
+                (grouped[cat] = grouped[cat] || []).push(col);
             });
-        });
-        // Pozostałe kontrolki
-        document.getElementById('percentScale').addEventListener('change', e=>{
-            chart.applyOptions({ rightPriceScale: { mode: e.target.checked ? LightweightCharts.PriceScaleMode.Percentage : LightweightCharts.PriceScaleMode.Normal } });
-        });
-        document.getElementById('timeframe').addEventListener('change', e=>{
-            const now = Math.floor(Date.now()/1000);
-            if (e.target.value==='all') return chart.timeScale().fitContent();
-            const years = parseInt(e.target.value);
-            const from = new Date(); from.setFullYear(from.getFullYear()-years);
-            chart.timeScale().setVisibleRange({ from: Math.floor(from.getTime()/1000), to: now });
-        });
-        document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
-            const img = await chart.takeScreenshot();
-            const a = document.createElement('a'); a.href=img; a.download='chart.png'; a.click();
-        });
-        document.getElementById('themeToggle').addEventListener('click', ()=>{
-            document.body.classList.toggle('dark');
-            document.getElementById('themeToggle').textContent = document.body.classList.contains('dark') ? 'Tryb jasny' : 'Tryb ciemny';
-        });
-    }
-    init();
+            // Budowanie drzewka
+            const tree = document.getElementById('seriesTree');
+            Object.entries(grouped).forEach(([cat, items]) => {
+                const header = document.createElement('div');
+                header.className = 'caret'; header.textContent = cat;
+                const child = document.createElement('ul'); child.className='nested';
+                items.forEach(col => {
+                    const li = document.createElement('li'); li.className='series-item';
+                    const cb = document.createElement('input'); cb.type='checkbox'; cb.dataset.id=col.column_id;
+                    const lbl = document.createElement('span'); lbl.textContent=col.column; lbl.className='series-label';
+                    li.append(cb, lbl);
+                    child.append(li);
+                    cb.addEventListener('change', e => updateSeries(col.column_id, e.target.checked));
+                });
+                tree.append(header, child);
+                header.addEventListener('click', () => {
+                    header.classList.toggle('open'); child.classList.toggle('open');
+                });
+            });
+            // Init chart
+            const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+                layout: { backgroundColor: getComputedStyle(document.body).getPropertyValue('--card-bg').trim(),
+                          textColor: getComputedStyle(document.body).getPropertyValue('--fg').trim() },
+                width: document.body.clientWidth - 280,
+                height: document.body.clientHeight - document.querySelector('.toolbar').offsetHeight,
+                rightPriceScale:{mode: LightweightCharts.PriceScaleMode.Normal},
+                crosshair:{mode: LightweightCharts.CrosshairMode.Normal},
+                localization:{dateFormat:'yyyy-MM-dd'}
+            });
+            window.addEventListener('resize', () =>
+                chart.applyOptions({width: document.body.clientWidth - 280, height: document.body.clientHeight - document.querySelector('.toolbar').offsetHeight})
+            );
+            const seriesMap = new Map();
+            function updateSeries(id, add) {
+                const col = columns.find(c=>c.column_id===id);
+                if (!col) return;
+                if (add) {
+                    let s;
+                    const t=document.getElementById('seriesType').value;
+                    if (t==='Candlestick') s=chart.addCandlestickSeries();
+                    else if (t==='Histogram') s=chart.addHistogramSeries({priceFormat:{type:'volume'}});
+                    else if (t==='Area') s=chart.addAreaSeries({ topColor:'rgba(79,70,229,0.6)', bottomColor:'rgba(79,70,229,0.1)', lineColor:'var(--primary)'});
+                    else s=chart.addLineSeries({color:'var(--accent)'});
+                    s.setData(col.data);
+                    s.applyOptions({title:col.column});
+                    seriesMap.set(id,s);
+                } else {
+                    const s=seriesMap.get(id);
+                    if (s) chart.removeSeries(s);
+                    seriesMap.delete(id);
+                }
+            }
+            // Kontrolki
+            document.getElementById('percentScale').addEventListener('change', e =>
+                chart.applyOptions({rightPriceScale:{mode:e.target.checked?LightweightCharts.PriceScaleMode.Percentage:LightweightCharts.PriceScaleMode.Normal}})
+            );
+            document.getElementById('timeframe').addEventListener('change', e => {
+                const now = Math.floor(Date.now()/1000);
+                if (e.target.value==='all') { chart.timeScale().fitContent(); return; }
+                const yrs=parseInt(e.target.value);
+                const from=new Date(); from.setFullYear(from.getFullYear()-yrs);
+                chart.timeScale().setVisibleRange({from:Math.floor(from.getTime()/1000), to:now});
+            });
+            document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
+                const img=await chart.takeScreenshot();
+                const a=document.createElement('a'); a.href=img; a.download='chart.png'; a.click();
+            });
+            document.getElementById('themeToggle').addEventListener('click', ()=>{
+                document.body.classList.toggle('dark');
+                const dark=document.body.classList.contains('dark');
+                document.getElementById('themeIcon').textContent = dark?'light_mode':'dark_mode';
+                document.getElementById('themeText').textContent = dark?'Tryb jasny':'Tryb ciemny';
+                chart.applyOptions({layout:{backgroundColor:getComputedStyle(document.body).getPropertyValue('--card-bg').trim(), textColor:getComputedStyle(document.body).getPropertyValue('--fg').trim()}});
+            });
+        }
+        init();
     </script>
 </body>
 </html>
