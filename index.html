@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wykres TradingView - Podaż pieniądza M1, M2, M3</title>
-    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <title>Wykres TradingView - Podaż pieniądza</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
@@ -34,8 +33,54 @@
             font-size: 32px;
             font-weight: 700;
             color: #1a202c;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
             text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            background-color: #3182ce;
+            color: #ffffff;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+        }
+
+        button:hover {
+            background-color: #2b6cb0;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toggle label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #2d3748;
+        }
+
+        .toggle input {
+            cursor: pointer;
         }
 
         .legend {
@@ -43,6 +88,7 @@
             justify-content: center;
             gap: 24px;
             margin-bottom: 24px;
+            flex-wrap: wrap;
         }
 
         .legend-item {
@@ -72,87 +118,66 @@
             border-radius: 12px;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
         }
+
+        #error {
+            color: #e53e3e;
+            font-size: 16px;
+            text-align: center;
+            margin-top: 24px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Podaż pieniądza: M1, M2, M3</h1>
-        <div class="legend">
-            <div class="legend-item" id="legend-m1" onclick="toggleSeries('m1')">
-                <span style="background-color: #3182ce;"></span> M1
-            </div>
-            <div class="legend-item" id="legend-m2" onclick="toggleSeries('m2')">
-                <span style="background-color: #38a169;"></span> M2
-            </div>
-            <div class="legend-item" id="legend-m3" onclick="toggleSeries('m3')">
-                <span style="background-color: #e53e3e;"></span> M3
+        <h1>Podaż pieniądza</h1>
+        <div class="controls">
+            <button onclick="resetChart()">Reset</button>
+            <button onclick="showLastYears(10)">Ostatnie 10 lat</button>
+            <button onclick="showLastYears(5)">Ostatnie 5 lat</button>
+            <div class="toggle">
+                <label for="percentToggle">Zmiana %</label>
+                <input type="checkbox" id="percentToggle" onchange="togglePercentMode()">
             </div>
         </div>
+        <div class="legend" id="legend"></div>
         <div id="chart"></div>
+        <div id="error"></div>
     </div>
 
     <script>
-        // URL-e do plików JSON na GitHubie (Raw URL)
-        const dataUrls = {
-            m1: 'https://raw.githubusercontent.com/dankostecki/tvdemo/main/m1.json',
-            m2: 'https://raw.githubusercontent.com/dankostecki/tvdemo/main/m2.json',
-            m3: 'https://raw.githubusercontent.com/dankostecki/tvdemo/main/m3.json'
-        };
+        // Funkcja do ładowania skryptu dynamicznie
+        function loadScript(url) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = url;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        // URL do pojedynczego pliku JSON
+        const dataUrl = 'https://raw.githubusercontent.com/dankostecki/tvdemo/main/tradingview_all_categories.json';
 
         // Kolory dla serii
-        const seriesColors = {
-            m1: '#3182ce', // Niebieski
-            m2: '#38a169', // Zielony
-            m3: '#e53e3e'  // Czerwony
-        };
+        const colors = [
+            '#3182ce', '#38a169', '#e53e3e', '#f6ad55', '#805ad5',
+            '#ed64a6', '#4a5568', '#f56565', '#48bb78', '#ecc94b',
+            '#9f7aea', '#ed8936', '#2f855a', '#b83280', '#4c51bf',
+            '#c53030', '#68d391', '#d69e2e', '#6b46c1', '#f687b3',
+            '#2b6cb0', '#276749', '#9b2c2c', '#d97706', '#553c9a'
+        ];
 
-        // Inicjalizacja wykresu
-        const chart = LightweightCharts.createChart(document.getElementById('chart'), {
-            width: document.getElementById('chart').clientWidth,
-            height: 600,
-            layout: {
-                background: { color: '#ffffff' },
-                textColor: '#333333',
-            },
-            grid: {
-                vertLines: { color: '#e2e8f0' },
-                horzLines: { color: '#e2e8f0' },
-            },
-            timeScale: {
-                timeVisible: true,
-                secondsVisible: false,
-            },
-            localization: {
-                dateFormat: 'yyyy-MM-dd',
-            },
-        });
-
-        // Obiekt przechowujący serie
-        const series = {
-            m1: chart.addLineSeries({ color: seriesColors.m1, title: 'M1' }),
-            m2: chart.addLineSeries({ color: seriesColors.m2, title: 'M2' }),
-            m3: chart.addLineSeries({ color: seriesColors.m3, title: 'M3' })
-        };
-
-        // Obiekt przechowujący dane
-        const seriesData = {
-            m1: [],
-            m2: [],
-            m3: []
-        };
-
-        // Obiekt przechowujący widoczność serii
-        const seriesVisibility = {
-            m1: true,
-            m2: true,
-            m3: true
-        };
+        let chart = null;
+        const series = {};
+        const originalData = {};
+        const seriesData = {};
+        const seriesVisibility = {};
+        let isPercentMode = false;
 
         // Funkcja do usuwania duplikatów i uśredniania wartości
         function removeDuplicatesAndAverage(data) {
             const groupedByTime = {};
-
-            // Grupowanie danych po dacie (time)
             data.forEach(item => {
                 if (!groupedByTime[item.time]) {
                     groupedByTime[item.time] = { values: [], count: 0 };
@@ -160,58 +185,204 @@
                 groupedByTime[item.time].values.push(item.value);
                 groupedByTime[item.time].count++;
             });
-
-            // Uśrednianie wartości dla każdej daty
             const result = Object.keys(groupedByTime).map(time => {
                 const values = groupedByTime[time].values;
                 const averageValue = values.reduce((sum, val) => sum + val, 0) / values.length;
                 return { time, value: averageValue };
             });
-
-            // Sortowanie po dacie
             return result.sort((a, b) => new Date(a.time) - new Date(b.time));
+        }
+
+        // Funkcja do obliczania zmiany procentowej
+        function calculatePercentChange(data, startValue) {
+            if (!startValue) return data.map(item => ({ time: item.time, value: 0 }));
+            return data.map(item => ({
+                time: item.time,
+                value: ((item.value - startValue) / startValue) * 100
+            }));
+        }
+
+        // Funkcja do aktualizacji danych na wykresie
+        function updateChartData() {
+            const visibleRange = chart.timeScale().getVisibleRange();
+            const fromDate = visibleRange ? new Date(visibleRange.from * 1000) : null;
+
+            for (const key of Object.keys(series)) {
+                if (!seriesData[key].length) continue;
+
+                let dataToShow = [...seriesData[key]];
+
+                if (isPercentMode) {
+                    let startValue = null;
+                    if (fromDate) {
+                        const firstVisibleItem = dataToShow.find(item => new Date(item.time) >= fromDate);
+                        startValue = firstVisibleItem ? firstVisibleItem.value : dataToShow[0].value;
+                    } else {
+                        startValue = dataToShow[0].value;
+                    }
+                    dataToShow = calculatePercentChange(dataToShow, startValue);
+                }
+
+                if (seriesVisibility[key]) {
+                    series[key].setData(dataToShow);
+                } else {
+                    series[key].setData([]);
+                }
+
+                chart.options().rightPriceScale = {
+                    mode: isPercentMode ? LightweightCharts.PriceScaleMode.Percentage : LightweightCharts.PriceScaleMode.Normal
+                };
+            }
+            chart.timeScale().fitContent();
         }
 
         // Funkcja do wczytywania danych
         async function loadData() {
             try {
-                for (const [key, url] of Object.entries(dataUrls)) {
-                    const response = await fetch(url);
-                    if (!response.ok) throw new Error(`Nie udało się wczytać ${key}`);
-                    const data = await response.json();
-                    // Usuwanie duplikatów i uśrednianie wartości
-                    const processedData = removeDuplicatesAndAverage(data);
+                const response = await fetch(dataUrl);
+                if (!response.ok) throw new Error('Nie udało się wczytać danych');
+                const data = await response.json();
+
+                const legendContainer = document.getElementById('legend');
+                legendContainer.innerHTML = '';
+
+                data.categories.forEach((category, index) => {
+                    const key = `${category.name}_${category.column_id}`;
+                    const processedData = removeDuplicatesAndAverage(category.data);
+
+                    originalData[key] = processedData;
                     seriesData[key] = processedData;
+                    seriesVisibility[key] = true;
+
+                    // Dodanie serii do wykresu
+                    const color = colors[index % colors.length];
+                    series[key] = chart.addLineSeries({ color, title: category.name });
+
+                    // Dodanie elementu legendy
+                    const legendItem = document.createElement('div');
+                    legendItem.className = 'legend-item';
+                    legendItem.id = `legend-${key}`;
+                    legendItem.onclick = () => toggleSeries(key);
+                    legendItem.innerHTML = `<span style="background-color: ${color};"></span> ${category.name}`;
+                    legendContainer.appendChild(legendItem);
+
+                    // Ustawienie danych
                     series[key].setData(processedData);
-                }
+                });
+
                 chart.timeScale().fitContent();
             } catch (error) {
                 console.error('Błąd podczas wczytywania danych:', error);
-                alert('Wystąpił błąd podczas wczytywania danych. Sprawdź konsolę dla szczegółów.');
+                document.getElementById('error').textContent = 'Wystąpił błąd podczas wczytywania danych: ' + error.message;
             }
         }
 
         // Funkcja do przełączania widoczności serii
         function toggleSeries(key) {
+            if (!series[key]) return;
             seriesVisibility[key] = !seriesVisibility[key];
             const legendItem = document.getElementById(`legend-${key}`);
             if (seriesVisibility[key]) {
                 legendItem.classList.remove('disabled');
-                series[key].setData(seriesData[key]);
             } else {
                 legendItem.classList.add('disabled');
-                series[key].setData([]);
             }
-            chart.timeScale().fitContent();
+            updateChartData();
         }
 
-        // Wczytaj dane po załadowaniu strony
-        loadData();
+        // Funkcja do resetowania wykresu
+        function resetChart() {
+            for (const key of Object.keys(seriesVisibility)) {
+                seriesVisibility[key] = true;
+                const legendItem = document.getElementById(`legend-${key}`);
+                legendItem.classList.remove('disabled');
+            }
 
-        // Obsługa zmiany rozmiaru okna
-        window.addEventListener('resize', () => {
-            chart.resize(document.getElementById('chart').clientWidth, 600);
-        });
+            isPercentMode = false;
+            document.getElementById('percentToggle').checked = false;
+
+            for (const key of Object.keys(seriesData)) {
+                seriesData[key] = [...originalData[key]];
+            }
+
+            updateChartData();
+        }
+
+        // Funkcja do pokazywania ostatnich X lat
+        function showLastYears(years) {
+            const latestDate = new Date('2025-03-30');
+            const startDate = new Date(latestDate);
+            startDate.setFullYear(startDate.getFullYear() - years);
+
+            for (const key of Object.keys(seriesData)) {
+                seriesData[key] = originalData[key].filter(item => {
+                    const itemDate = new Date(item.time);
+                    return itemDate >= startDate && itemDate <= latestDate;
+                });
+            }
+
+            updateChartData();
+        }
+
+        // Funkcja do przełączania trybu procentowego
+        function togglePercentMode() {
+            isPercentMode = document.getElementById('percentToggle').checked;
+
+            for (const key of Object.keys(seriesData)) {
+                seriesData[key] = [...originalData[key]];
+            }
+
+            updateChartData();
+        }
+
+        // Inicjalizacja wykresu po załadowaniu biblioteki
+        async function initChart() {
+            try {
+                await loadScript('https://unpkg.com/lightweight-charts@4.0.1/dist/lightweight-charts.standalone.production.js');
+
+                if (!window.LightweightCharts) {
+                    throw new Error('Biblioteka Lightweight Charts nie została załadowana.');
+                }
+
+                chart = LightweightCharts.createChart(document.getElementById('chart'), {
+                    width: document.getElementById('chart').clientWidth,
+                    height: 600,
+                    layout: {
+                        background: { color: '#ffffff' },
+                        textColor: '#333333',
+                    },
+                    grid: {
+                        vertLines: { color: '#e2e8f0' },
+                        horzLines: { color: '#e2e8f0' },
+                    },
+                    timeScale: {
+                        timeVisible: true,
+                        secondsVisible: false,
+                    },
+                    localization: {
+                        dateFormat: 'yyyy-MM-dd',
+                    },
+                    rightPriceScale: {
+                        mode: LightweightCharts.PriceScaleMode.Normal
+                    }
+                });
+
+                await loadData();
+
+                window.addEventListener('resize', () => {
+                    if (chart) {
+                        chart.resize(document.getElementById('chart').clientWidth, 600);
+                    }
+                });
+
+            } catch (error) {
+                console.error('Błąd podczas inicjalizacji wykresu:', error);
+                document.getElementById('error').textContent = 'Wystąpił błąd podczas inicjalizacji wykresu: ' + error.message;
+            }
+        }
+
+        // Uruchom inicjalizację wykresu
+        initChart();
     </script>
 </body>
 </html>
