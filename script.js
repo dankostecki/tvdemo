@@ -2,10 +2,18 @@
 async function fetchData() {
   try {
     const response = await fetch('data.json');
+    if (!response.ok) {
+      throw new Error(`Błąd HTTP: ${response.status}`);
+    }
     const data = await response.json();
+    // Sprawdzenie formatu danych
+    if (!Array.isArray(data) || !data.every(item => 'time' in item && 'value' in item)) {
+      throw new Error('Nieprawidłowy format danych JSON');
+    }
     return data;
   } catch (error) {
-    console.error('Błąd podczas wczytywania JSON:', error);
+    document.getElementById('error').textContent = `Błąd wczytywania danych: ${error.message}`;
+    console.error('Błąd:', error);
     return [];
   }
 }
@@ -13,8 +21,12 @@ async function fetchData() {
 // Funkcja do utworzenia wykresu
 async function createChart() {
   const chartContainer = document.getElementById('chart');
-  
-  // Tworzenie wykresu za pomocą Lightweight Charts
+  if (!chartContainer) {
+    document.getElementById('error').textContent = 'Kontener wykresu nie znaleziony';
+    return;
+  }
+
+  // Tworzenie wykresu
   const chart = LightweightCharts.createChart(chartContainer, {
     width: chartContainer.clientWidth,
     height: 400,
@@ -38,13 +50,17 @@ async function createChart() {
     lineWidth: 2,
   });
 
-  // Wczytanie danych JSON
+  // Wczytanie danych
   const data = await fetchData();
+  if (data.length === 0) {
+    document.getElementById('error').textContent = 'Brak danych do wyświetlenia';
+    return;
+  }
 
   // Ustawienie danych na wykresie
   lineSeries.setData(data);
 
-  // Automatyczne dopasowanie skali
+  // Dopasowanie skali
   chart.timeScale().fitContent();
 
   // Obsługa zmiany rozmiaru okna
@@ -53,5 +69,5 @@ async function createChart() {
   });
 }
 
-// Uruchomienie funkcji
-createChart();
+// Uruchomienie funkcji po załadowaniu strony
+document.addEventListener('DOMContentLoaded', createChart);
