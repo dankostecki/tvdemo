@@ -6,7 +6,6 @@ async function fetchData() {
       throw new Error(`Błąd HTTP: ${response.status}`);
     }
     const data = await response.json();
-    // Sprawdzenie formatu danych
     if (!Array.isArray(data) || !data.every(item => 'time' in item && 'value' in item)) {
       throw new Error('Nieprawidłowy format danych JSON');
     }
@@ -16,6 +15,16 @@ async function fetchData() {
     console.error('Błąd:', error);
     return [];
   }
+}
+
+// Funkcja do przeliczania danych na skalę procentową
+function convertToPercentScale(data) {
+  if (data.length === 0) return [];
+  const baseValue = data[0].value; // Pierwsza wartość jako punkt odniesienia
+  return data.map(item => ({
+    time: item.time,
+    value: ((item.value - baseValue) / baseValue) * 100 // Procentowa zmiana
+  }));
 }
 
 // Funkcja do utworzenia wykresu
@@ -38,6 +47,9 @@ async function createChart() {
       vertLines: { color: '#f0f0f0' },
       horLines: { color: '#f0f0f0' },
     },
+    rightPriceScale: {
+      mode: LightweightCharts.PriceScaleMode.Normal, // Domyślnie liniowa
+    },
     timeScale: {
       timeVisible: true,
       secondsVisible: false,
@@ -51,17 +63,45 @@ async function createChart() {
   });
 
   // Wczytanie danych
-  const data = await fetchData();
-  if (data.length === 0) {
+  const rawData = await fetchData();
+  if (rawData.length === 0) {
     document.getElementById('error').textContent = 'Brak danych do wyświetlenia';
     return;
   }
 
-  // Ustawienie danych na wykresie
-  lineSeries.setData(data);
+  // Flaga do przełączania skali
+  let isPercentScale = false;
 
-  // Dopasowanie skali
-  chart.timeScale().fitContent();
+  // Funkcja do aktualizacji wykresu
+  function updateChart() {
+    const data = isPercentScale ? convertToPercentScale(rawData) : rawData;
+    lineSeries.setData(data);
+    chart.applyOptions({
+      rightPriceScale: {
+        mode: isPercentScale
+          ? LightweightCharts.PriceScaleMode.Normal // Używamy normalnej skali, ale z wartościami procentowymi
+          : LightweightCharts.PriceScaleMode.Normal,
+        // Formatowanie osi Y dla skali procentowej
+        scaleMargins: { top: 0.1, bottom: 0.1 },
+      },
+    });
+    // Dodajemy formatowanie etykiet osi Y
+    chart.priceScale('right').applyOptions({
+      formatter: price => isPercentScale ? `${price.toFixed(2)}%` : price.toFixed(2),
+    });
+    chart.timeScale().fitContent();
+  }
+
+  // Ustawienie początkowych danych
+  updateChart();
+
+  // Obsługa przycisku przełączania skali
+  const toggleButton = document.getElementById('toggleScale');
+  toggleButton.addEventListener('click', () => {
+    isPercentScale = !isPercentScale;
+    toggleButton.textContent = `Zmień skalę (${isPercentScale ? 'Liniowa' : 'Procentowa'})`;
+    updateChart();
+  });
 
   // Obsługa zmiany rozmiaru okna
   window.addEventListener('resize', () => {
