@@ -18,7 +18,7 @@ body {
 
 button {
   padding: 8px 16px;
-  margin-bottom: 10px;
+  margin: 5px;
   cursor: pointer;
   background-color: #2962FF;
   color: white;
@@ -28,4 +28,9 @@ button {
 
 button:hover {
   background-color: #1a4ed8;
+}
+
+button.active {
+  background-color: #1a4ed8;
+  font-weight: bold;
 }
