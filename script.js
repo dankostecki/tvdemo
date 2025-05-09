@@ -31,39 +31,39 @@ function convertToPercentScale(data) {
 function filterDataByRange(data, range) {
   if (range === 'all') return data;
 
-  if (data.length === 0) return [];
-
-  // Sortowanie danych chronologicznie (na wszelki wypadek)
-  const sortedData = [...data].sort((a, b) => new Date(a.time) - new Date(b.time));
-
-  // Pobranie daty ostatniego punktu
-  const latestDate = new Date(sortedData[sortedData.length - 1].time);
-  let monthsBack;
-
-  if (range === 'quarter') {
-    monthsBack = 3; // Ostatnie 3 miesiące
-  } else if (range === 'year') {
-    monthsBack = 12; // Ostatnie 12 miesięcy
-  } else {
-    return sortedData; // Zabezpieczenie
+  if (data.length === 0) {
+    console.log('Brak danych do filtrowania');
+    return [];
   }
 
-  // Obliczenie daty odcięcia
-  const cutoffDate = new Date(latestDate);
-  cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack + 1); // +1, aby uwzględnić cały miesiąc
-  cutoffDate.setDate(1); // Ustawienie na początek miesiąca
+  // Sortowanie danych chronologicznie
+  const sortedData = [...data].sort((a, b) => new Date(a.time) - new Date(b.time));
 
-  // Filtrowanie danych
-  const filteredData = sortedData.filter(item => {
-    const itemDate = new Date(item.time);
-    return itemDate >= cutoffDate;
-  });
+  // Diagnostyka: wyświetlenie wszystkich dat
+  console.log('Wszystkie daty w danych:', sortedData.map(item => item.time));
+
+  let numPoints;
+  if (range === 'quarter') {
+    numPoints = 3; // Ostatnie 3 miesiące
+  } else if (range === 'year') {
+    numPoints = 12; // Ostatnie 12 miesięcy
+  } else {
+    console.log('Nieznany zakres:', range);
+    return sortedData;
+  }
+
+  // Wybór ostatnich N punktów
+  const filteredData = sortedData.slice(-numPoints);
 
   // Diagnostyka
   console.log(`Zakres: ${range}`);
-  console.log(`Data odcięcia: ${cutoffDate.toISOString().split('T')[0]}`);
+  console.log(`Oczekiwana liczba punktów: ${numPoints}`);
   console.log(`Liczba punktów po filtrowaniu: ${filteredData.length}`);
   console.log('Przefiltrowane dane:', filteredData);
+
+  if (filteredData.length === 0) {
+    console.log(`Brak danych dla zakresu ${range}`);
+  }
 
   return filteredData;
 }
@@ -110,6 +110,8 @@ async function createChart() {
     return;
   }
 
+  console.log('Wczytane dane:', rawData);
+
   // Flagi i stan
   let isPercentScale = false;
   let currentRange = 'all'; // Domyślnie wszystkie dane
@@ -129,6 +131,7 @@ async function createChart() {
     // Przeliczenie na skalę procentową, jeśli wybrano
     const data = isPercentScale ? convertToPercentScale(filteredData) : filteredData;
     
+    console.log('Dane przekazane do wykresu:', data);
     lineSeries.setData(data);
     chart.applyOptions({
       rightPriceScale: {
