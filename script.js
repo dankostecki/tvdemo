@@ -20,7 +20,7 @@ async function fetchData() {
 // Funkcja do przeliczania danych na skalę procentową
 function convertToPercentScale(data) {
   if (data.length === 0) return [];
-  const baseValue = data[0].value; // Pierwsza wartość w wybranym zakresie jako punkt odniesienia
+  const baseValue = data[0].value; // Pierwsza wartość w wybranym zakresie
   return data.map(item => ({
     time: item.time,
     value: ((item.value - baseValue) / baseValue) * 100 // Procentowa zmiana
@@ -30,20 +30,42 @@ function convertToPercentScale(data) {
 // Funkcja do filtrowania danych według zakresu
 function filterDataByRange(data, range) {
   if (range === 'all') return data;
-  
-  const latestDate = new Date(data[data.length - 1].time);
+
+  if (data.length === 0) return [];
+
+  // Sortowanie danych chronologicznie (na wszelki wypadek)
+  const sortedData = [...data].sort((a, b) => new Date(a.time) - new Date(b.time));
+
+  // Pobranie daty ostatniego punktu
+  const latestDate = new Date(sortedData[sortedData.length - 1].time);
   let monthsBack;
 
   if (range === 'quarter') {
     monthsBack = 3; // Ostatnie 3 miesiące
   } else if (range === 'year') {
     monthsBack = 12; // Ostatnie 12 miesięcy
+  } else {
+    return sortedData; // Zabezpieczenie
   }
 
+  // Obliczenie daty odcięcia
   const cutoffDate = new Date(latestDate);
-  cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack);
+  cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack + 1); // +1, aby uwzględnić cały miesiąc
+  cutoffDate.setDate(1); // Ustawienie na początek miesiąca
 
-  return data.filter(item => new Date(item.time) >= cutoffDate);
+  // Filtrowanie danych
+  const filteredData = sortedData.filter(item => {
+    const itemDate = new Date(item.time);
+    return itemDate >= cutoffDate;
+  });
+
+  // Diagnostyka
+  console.log(`Zakres: ${range}`);
+  console.log(`Data odcięcia: ${cutoffDate.toISOString().split('T')[0]}`);
+  console.log(`Liczba punktów po filtrowaniu: ${filteredData.length}`);
+  console.log('Przefiltrowane dane:', filteredData);
+
+  return filteredData;
 }
 
 // Funkcja do utworzenia wykresu
@@ -96,6 +118,14 @@ async function createChart() {
   function updateChart() {
     // Filtrowanie danych według zakresu
     let filteredData = filterDataByRange(rawData, currentRange);
+    if (filteredData.length === 0) {
+      document.getElementById('error').textContent = `Brak danych dla zakresu: ${currentRange}`;
+      lineSeries.setData([]);
+      return;
+    } else {
+      document.getElementById('error').textContent = '';
+    }
+
     // Przeliczenie na skalę procentową, jeśli wybrano
     const data = isPercentScale ? convertToPercentScale(filteredData) : filteredData;
     
