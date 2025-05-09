@@ -20,11 +20,30 @@ async function fetchData() {
 // Funkcja do przeliczania danych na skalę procentową
 function convertToPercentScale(data) {
   if (data.length === 0) return [];
-  const baseValue = data[0].value; // Pierwsza wartość jako punkt odniesienia
+  const baseValue = data[0].value; // Pierwsza wartość w wybranym zakresie jako punkt odniesienia
   return data.map(item => ({
     time: item.time,
     value: ((item.value - baseValue) / baseValue) * 100 // Procentowa zmiana
   }));
+}
+
+// Funkcja do filtrowania danych według zakresu
+function filterDataByRange(data, range) {
+  if (range === 'all') return data;
+  
+  const latestDate = new Date(data[data.length - 1].time);
+  let monthsBack;
+
+  if (range === 'quarter') {
+    monthsBack = 3; // Ostatnie 3 miesiące
+  } else if (range === 'year') {
+    monthsBack = 12; // Ostatnie 12 miesięcy
+  }
+
+  const cutoffDate = new Date(latestDate);
+  cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack);
+
+  return data.filter(item => new Date(item.time) >= cutoffDate);
 }
 
 // Funkcja do utworzenia wykresu
@@ -48,7 +67,7 @@ async function createChart() {
       horLines: { color: '#f0f0f0' },
     },
     rightPriceScale: {
-      mode: LightweightCharts.PriceScaleMode.Normal, // Domyślnie liniowa
+      mode: LightweightCharts.PriceScaleMode.Normal,
     },
     timeScale: {
       timeVisible: true,
@@ -69,23 +88,25 @@ async function createChart() {
     return;
   }
 
-  // Flaga do przełączania skali
+  // Flagi i stan
   let isPercentScale = false;
+  let currentRange = 'all'; // Domyślnie wszystkie dane
 
   // Funkcja do aktualizacji wykresu
   function updateChart() {
-    const data = isPercentScale ? convertToPercentScale(rawData) : rawData;
+    // Filtrowanie danych według zakresu
+    let filteredData = filterDataByRange(rawData, currentRange);
+    // Przeliczenie na skalę procentową, jeśli wybrano
+    const data = isPercentScale ? convertToPercentScale(filteredData) : filteredData;
+    
     lineSeries.setData(data);
     chart.applyOptions({
       rightPriceScale: {
-        mode: isPercentScale
-          ? LightweightCharts.PriceScaleMode.Normal // Używamy normalnej skali, ale z wartościami procentowymi
-          : LightweightCharts.PriceScaleMode.Normal,
-        // Formatowanie osi Y dla skali procentowej
+        mode: LightweightCharts.PriceScaleMode.Normal,
         scaleMargins: { top: 0.1, bottom: 0.1 },
       },
     });
-    // Dodajemy formatowanie etykiet osi Y
+    // Formatowanie osi Y
     chart.priceScale('right').applyOptions({
       formatter: price => isPercentScale ? `${price.toFixed(2)}%` : price.toFixed(2),
     });
@@ -95,13 +116,47 @@ async function createChart() {
   // Ustawienie początkowych danych
   updateChart();
 
-  // Obsługa przycisku przełączania skali
-  const toggleButton = document.getElementById('toggleScale');
-  toggleButton.addEventListener('click', () => {
+  // Obsługa przycisku zmiany skali
+  const toggleScaleButton = document.getElementById('toggleScale');
+  toggleScaleButton.addEventListener('click', () => {
     isPercentScale = !isPercentScale;
-    toggleButton.textContent = `Zmień skalę (${isPercentScale ? 'Liniowa' : 'Procentowa'})`;
+    toggleScaleButton.textContent = `Zmień skalę (${isPercentScale ? 'Liniowa' : 'Procentowa'})`;
     updateChart();
   });
+
+  // Obsługa przycisków zakresu danych
+  const rangeButtons = {
+    all: document.getElementById('allData'),
+    quarter: document.getElementById('lastQuarter'),
+    year: document.getElementById('lastYear'),
+  };
+
+  function setActiveButton(range) {
+    Object.keys(rangeButtons).forEach(key => {
+      rangeButtons[key].classList.toggle('active', key === range);
+    });
+  }
+
+  rangeButtons.all.addEventListener('click', () => {
+    currentRange = 'all';
+    setActiveButton('all');
+    updateChart();
+  });
+
+  rangeButtons.quarter.addEventListener('click', () => {
+    currentRange = 'quarter';
+    setActiveButton('quarter');
+    updateChart();
+  });
+
+  rangeButtons.year.addEventListener('click', () => {
+    currentRange = 'year';
+    setActiveButton('year');
+    updateChart();
+  });
+
+  // Ustawienie domyślnego aktywnego przycisku
+  setActiveButton('all');
 
   // Obsługa zmiany rozmiaru okna
   window.addEventListener('resize', () => {
