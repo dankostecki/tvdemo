@@ -148,6 +148,30 @@
             m3: true
         };
 
+        // Funkcja do usuwania duplikatów i uśredniania wartości
+        function removeDuplicatesAndAverage(data) {
+            const groupedByTime = {};
+
+            // Grupowanie danych po dacie (time)
+            data.forEach(item => {
+                if (!groupedByTime[item.time]) {
+                    groupedByTime[item.time] = { values: [], count: 0 };
+                }
+                groupedByTime[item.time].values.push(item.value);
+                groupedByTime[item.time].count++;
+            });
+
+            // Uśrednianie wartości dla każdej daty
+            const result = Object.keys(groupedByTime).map(time => {
+                const values = groupedByTime[time].values;
+                const averageValue = values.reduce((sum, val) => sum + val, 0) / values.length;
+                return { time, value: averageValue };
+            });
+
+            // Sortowanie po dacie
+            return result.sort((a, b) => new Date(a.time) - new Date(b.time));
+        }
+
         // Funkcja do wczytywania danych
         async function loadData() {
             try {
@@ -155,8 +179,10 @@
                     const response = await fetch(url);
                     if (!response.ok) throw new Error(`Nie udało się wczytać ${key}`);
                     const data = await response.json();
-                    seriesData[key] = data;
-                    series[key].setData(data);
+                    // Usuwanie duplikatów i uśrednianie wartości
+                    const processedData = removeDuplicatesAndAverage(data);
+                    seriesData[key] = processedData;
+                    series[key].setData(processedData);
                 }
                 chart.timeScale().fitContent();
             } catch (error) {
