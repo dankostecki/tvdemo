@@ -4,27 +4,27 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TradingView Data Service</title>
-  <!-- TailwindCSS CDN -->
+  <!-- TailwindCSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
   <!-- Lightweight Charts -->
   <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-  <!-- Twoja data.js -->
+  <!-- Najpierw data.js definiujące `const data = [...]` -->
   <script src="data.js"></script>
 </head>
-<body class="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col h-screen">
   <!-- Navbar -->
   <nav class="flex items-center justify-between p-4 bg-white dark:bg-gray-800 shadow-md">
     <h1 class="text-xl font-semibold">📈 TradingView Chart</h1>
     <div class="flex items-center space-x-3">
-      <button id="lineBtn"       class="px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">Linia</button>
-      <button id="candleBtn"     class="px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">Świece</button>
-      <button id="areaBtn"       class="px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">Obszar</button>
-      <button id="histogramBtn"  class="px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">Histogram</button>
-      <label class="flex items-center space-x-1 px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
+      <button id="lineBtn" class="px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">Linia</button>
+      <button id="candleBtn" class="px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">Świece</button>
+      <button id="areaBtn" class="px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">Obszar</button>
+      <button id="histogramBtn" class="px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">Histogram</button>
+      <label class="flex items-center px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
         <span class="material-icons">percent</span>
-        <input type="checkbox" id="percentScale" />
+        <input type="checkbox" id="percentScale" class="ml-1" />
       </label>
       <select id="timeframe" class="px-3 py-1 bg-white dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
         <option value="all">Wszystko</option>
@@ -37,75 +37,78 @@
     </div>
   </nav>
 
-  <!-- Chart -->
-  <div id="chart" class="m-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg" style="height: calc(100vh - 88px);"></div>
+  <!-- Chart Container -->
+  <div id="chart" class="flex-1 m-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg"></div>
 
   <script>
-    const chart = LightweightCharts.createChart(document.getElementById('chart'), {
-      layout: {
-        backgroundColor: getComputedStyle(document.body).getPropertyValue('--tw-bg-opacity') === '1' ? getComputedStyle(document.body).backgroundColor : '#1f2937',
-        textColor: getComputedStyle(document.body).getPropertyValue('--tw-text-opacity') === '1' ? getComputedStyle(document.body).color : '#f3f4f6'
-      },
-      rightPriceScale: { mode: LightweightCharts.PriceScaleMode.Normal },
-      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-      localization: { dateFormat: 'yyyy-MM-dd' },
-    });
-
-    // Domyślnie série liniowa
-    let series = chart.addLineSeries({ color: '#3b82f6' });
-    series.setData(data);
-
-    // Helpers
-    function resetSeries(type) {
-      chart.removeSeries(series);
-      switch(type) {
-        case 'candle': series = chart.addCandlestickSeries(); break;
-        case 'area':   series = chart.addAreaSeries({
-                          topColor: 'rgba(59,130,246,0.5)',
-                          bottomColor: 'rgba(59,130,246,0.1)',
-                          lineColor: '#3b82f6'
-                        }); break;
-        case 'hist':   series = chart.addHistogramSeries({ priceFormat: { type: 'volume' } }); break;
-        default:       series = chart.addLineSeries({ color: '#3b82f6' });
+    document.addEventListener('DOMContentLoaded', () => {
+      if (typeof data === 'undefined' || !Array.isArray(data) || data.length === 0) {
+        console.error('Brak danych: upewnij się, że data.js definiuje `const data = [...]` i jest załadowany przed tą sekcją.');
+        return;
       }
-      series.setData(data);
-      applyScale();
-      applyTimeframe();
-    }
-    function applyScale() {
-      const pct = document.getElementById('percentScale').checked;
-      chart.applyOptions({ rightPriceScale: { mode: pct ? LightweightCharts.PriceScaleMode.Percentage : LightweightCharts.PriceScaleMode.Normal } });
-    }
-    function applyTimeframe() {
-      const val = document.getElementById('timeframe').value;
-      if (val === 'all') return chart.timeScale().fitContent();
-      const yrs = parseInt(val);
-      const now = Math.floor(Date.now()/1000);
-      const from = new Date(); from.setFullYear(from.getFullYear() - yrs);
-      chart.timeScale().setVisibleRange({ from: Math.floor(from.getTime()/1000), to: now });
-    }
 
-    // Eventy przycisków
-    document.getElementById('lineBtn').onclick      = () => resetSeries('line');
-    document.getElementById('candleBtn').onclick    = () => resetSeries('candle');
-    document.getElementById('areaBtn').onclick      = () => resetSeries('area');
-    document.getElementById('histogramBtn').onclick = () => resetSeries('hist');
-    document.getElementById('percentScale').onchange = applyScale;
-    document.getElementById('timeframe').onchange    = applyTimeframe;
-    document.getElementById('themeToggle').onclick  = () => {
-      document.body.classList.toggle('dark');
-      const icon = document.getElementById('themeIcon');
-      icon.textContent = document.body.classList.contains('dark') ? 'light_mode' : 'dark_mode';
-      chart.applyOptions({
+      // Inicjalizacja chartu
+      const chart = LightweightCharts.createChart(document.getElementById('chart'), {
         layout: {
-          backgroundColor: getComputedStyle(document.body).backgroundColor,
+          backgroundColor: getComputedStyle(document.getElementById('chart')).backgroundColor,
           textColor: getComputedStyle(document.body).color
-        }
+        },
+        rightPriceScale: { mode: LightweightCharts.PriceScaleMode.Normal },
+        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+        localization: { dateFormat: 'yyyy-MM-dd' },
       });
-    };
 
-    // Dopasuj zakres przy starcie
-    chart.timeScale().fitContent();
+      let series = chart.addLineSeries({ color: '#3b82f6' });
+      series.setData(data);
+
+      // Helpers
+      function resetSeries(type) {
+        chart.removeSeries(series);
+        switch(type) {
+          case 'candle': series = chart.addCandlestickSeries(); break;
+          case 'area': series = chart.addAreaSeries({ topColor: 'rgba(59,130,246,0.5)', bottomColor: 'rgba(59,130,246,0.1)', lineColor: '#3b82f6' }); break;
+          case 'hist': series = chart.addHistogramSeries({ priceFormat: { type: 'volume' } }); break;
+          default: series = chart.addLineSeries({ color: '#3b82f6' });
+        }
+        series.setData(data);
+        applyScale();
+        applyTimeframe();
+      }
+
+      function applyScale() {
+        const pct = document.getElementById('percentScale').checked;
+        chart.applyOptions({ rightPriceScale: { mode: pct ? LightweightCharts.PriceScaleMode.Percentage : LightweightCharts.PriceScaleMode.Normal } });
+      }
+
+      function applyTimeframe() {
+        const val = document.getElementById('timeframe').value;
+        if (val === 'all') {
+          chart.timeScale().fitContent();
+          return;
+        }
+        const yrs = parseInt(val, 10);
+        const now = Math.floor(Date.now() / 1000);
+        const from = new Date(); from.setFullYear(from.getFullYear() - yrs);
+        chart.timeScale().setVisibleRange({ from: Math.floor(from.getTime() / 1000), to: now });
+      }
+
+      // Eventy
+      document.getElementById('lineBtn').addEventListener('click', () => resetSeries('line'));
+      document.getElementById('candleBtn').addEventListener('click', () => resetSeries('candle'));
+      document.getElementById('areaBtn').addEventListener('click', () => resetSeries('area'));
+      document.getElementById('histogramBtn').addEventListener('click', () => resetSeries('hist'));
+      document.getElementById('percentScale').addEventListener('change', applyScale);
+      document.getElementById('timeframe').addEventListener('change', applyTimeframe);
+      document.getElementById('themeToggle').addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        const isDark = document.documentElement.classList.contains('dark');
+        document.getElementById('themeIcon').textContent = isDark ? 'light_mode' : 'dark_mode';
+        chart.applyOptions({ layout: { backgroundColor: getComputedStyle(document.getElementById('chart')).backgroundColor, textColor: getComputedStyle(document.body).color } });
+      });
+
+      // Fit content on load
+      chart.timeScale().fitContent();
+    });
   </script>
 </body>
 </html>
