@@ -9,4 +9,9 @@ body {
   max-width: 800px;
   height: 400px;
   margin: 0 auto;
+  border: 1px solid #ddd; /* Dodano obramowanie dla widoczności */
+}
+
+#error {
+  margin-top: 10px;
 }
